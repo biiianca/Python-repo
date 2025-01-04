@@ -1,11 +1,12 @@
 from tv_shows import showNewTVShows, addTVshow, addLastWatchedEpisode, updateScore, setDate
 from imdb import getNameFromLink
 from utils import verifyEpisodeFormat, verifyDateFormat
-from dbConnector import createTable, addTVShows
+from dbConnector import createTable, addTVShows, createTableForSnoozedTVShows
 
 
 if __name__ == "__main__":
     #createTable()
+    createTableForSnoozedTVShows()
     #addTVShows()
     showNewTVShows()
     while True:

@@ -40,3 +40,13 @@ def addTVShows():
         myDB.commit()
     except mysql.connector.Error as error:
         print(f"Error adding the TV shows: {error}")
+
+
+def createTableForSnoozedTVShows():
+    try:
+        myCursor.execute("CREATE TABLE snoozed_tv_shows (id INT AUTO_INCREMENT PRIMARY KEY, "
+                                                "tv_show_id INT,"
+                                                "FOREIGN KEY (tv_show_id) REFERENCES tv_shows(id) ON DELETE CASCADE")
+        print("snoozed_tv_shows tabel created")
+    except mysql.connector.Error as error:
+        print(f"Error at creating the table <snoozed_tv_shows>: {error}")

@@ -65,7 +65,14 @@ def setDate(date, tv_show_name):
     except mysql.connector.Error as error:
         print(f"Error updating the date: {error}")
 
-
+def deleteTVShow(tv_show_name):
+    try:
+        query="DELETE FROM tv_shows WHERE name = %s"
+        myCursor.execute(query, (tv_show_name,))
+        myDB.commit()
+        print(f"Tv show '{tv_show_name}' deleted")
+    except mysql.connector.Error as error:
+        print(f"Error at deleting the tv show: {error}")
 
 def getWatchedTVShows():
     try:
@@ -139,3 +146,45 @@ def showNewTVShows():
                 f"- {show['title']} (Score: {show['score']:.1f}, Release Date: {show['release_date']}, Link: {show['link']})")
     else:
         print("Couldn't find TV Shows.")
+
+def snoozeATVShow(tv_show_name):
+    try:
+        query="SELECT id FROM tv_shows WHERE name = %s"
+        myCursor.execute(query, (tv_show_name,))
+        tv_show_id = myCursor.fetchone()
+
+        if tv_show_id:
+            tv_show_id = tv_show_id[0]
+
+            secondQuery = "INSERT INTO snoozed_tv_shows (tv_show_id) VALUES (%s)"
+            myCursor.execute(secondQuery, (tv_show_id,))
+            myDB.commit()
+
+            print(f"TV Show '{tv_show_name}' has been snoozed")
+        else:
+            print(f"No TV Show found with the name '{tv_show_name}' in the database")
+
+    except mysql.connector.Error as error:
+        print(f"Error at snoozing the TV Show: {error}")
+
+
+def unsnoozeATVShow(tv_show_name):
+    try:
+        query = "SELECT id FROM tv_shows WHERE name = %s"
+        myCursor.execute(query, (tv_show_name,))
+        tv_show_id = myCursor.fetchone()
+
+        if tv_show_id:
+            tv_show_id = tv_show_id[0]
+
+            secondQuery = "DELETE FROM snoozed_tv_shows WHERE tv_show_id = %s"
+            myCursor.execute(secondQuery, (tv_show_id,))
+            myDB.commit()
+
+            print(f"TV Show '{tv_show_name}' has been unsnoozed")
+        else:
+            print(f"No TV Show found with the name '{tv_show_name}'")
+
+    except mysql.connector.Error as error:
+        print(f"Error at unsnoozing the TV Show: {error}")
+

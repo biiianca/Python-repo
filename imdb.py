@@ -18,7 +18,6 @@ def getNameFromLink(imdb_link):
         print(f"Request error: {e}")
         return None
 
-
 def getLatestEpisode(link):
     imdbID = link.split("/")[-2]
     url = f"https://www.omdbapi.com/?i={imdbID}&apikey={API_KEY}"
