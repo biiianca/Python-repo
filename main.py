@@ -1,10 +1,13 @@
-from tv_shows import addTVshow, addLastWatchedEpisode, updateScore, setDate
+from tv_shows import showNewTVShows, addTVshow, addLastWatchedEpisode, updateScore, setDate
 from imdb import getNameFromLink
 from utils import verifyEpisodeFormat, verifyDateFormat
-from dbConnector import createTable
+from dbConnector import createTable, addTVShows
+
 
 if __name__ == "__main__":
-    createTable()
+    #createTable()
+    #addTVShows()
+    showNewTVShows()
     while True:
         cmd = input("-> ").strip()
         if cmd.lower() == "exit":
@@ -47,4 +50,8 @@ if __name__ == "__main__":
                 print("Invalid command")
         except Exception as e:
             print(f"Error: {e}")
+
+
+
+
 
