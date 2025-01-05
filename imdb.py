@@ -18,21 +18,56 @@ def getNameFromLink(imdb_link):
         print(f"Request error: {e}")
         return None
 
-def getLatestEpisode(link):
+def getNextEpisode(link, last_episode_watched):
     imdbID = link.split("/")[-2]
-    url = f"https://www.omdbapi.com/?i={imdbID}&apikey={API_KEY}"
+    url = f"http://api.tvmaze.com/lookup/shows?imdb={imdbID}"
 
     try:
         response = requests.get(url)
         data = response.json()
 
-        if data.get('Response') == 'True':
-            return data.get('Title'), data.get('totalSeasons')
+        if response.status_code == 200 and data:
+            tv_show_id = data.get('id')
+            if tv_show_id:
+                episodes_url = f"http://api.tvmaze.com/shows/{tv_show_id}/episodes"
+                episodes_response = requests.get(episodes_url)
+                episode_list = episodes_response.json()
+
+                season_number, episode_number = map(int, last_episode_watched[1:].split('E'))
+                next_episode_details = None
+
+                for episode in episode_list:
+                    episode_season = episode['season']
+                    episode_episode_number = episode['number']
+                    if episode_season == season_number and episode_episode_number == episode_number + 1:
+                        next_episode_details = episode
+                        break
+                    elif episode_season == season_number + 1 and episode_episode_number == 1:
+                        next_episode_details = episode
+                        break
+
+                if next_episode_details:
+                    next_episode_info = {
+                        'title': next_episode_details['name'],
+                        'season': next_episode_details['season'],
+                        'episode': next_episode_details['number'],
+                        'imdbID': imdbID
+                    }
+                    return next_episode_info
+                else:
+                    return None
+
+            else:
+                print(f"Error: Couldn't find TV Show id for {imdbID}")
+                return None
+
         else:
-            raise Exception(f"Error fetching data: {data.get('Error')}")
+            print(f"Error fetching data for {imdbID}: {data.get('Error', 'Unknown Error')}")
+            return None
+
     except requests.exceptions.RequestException as e:
-        print(f"Request error: {e}")
-        return None, None
+        print(f"Request failed: {e}")
+        return None
 
 
 def fetchNewShowsFromIMDB(min_date, min_score):

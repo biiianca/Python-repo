@@ -1,14 +1,15 @@
-from tv_shows import showNewTVShows, addTVshow, addLastWatchedEpisode, updateScore, setDate
+from tv_shows import showNewTVShows, addTVshow, addLastWatchedEpisode, updateScore, setDate, listUnwatchedEpisodes, snoozeATVShow, unsnoozeATVShow
 from imdb import getNameFromLink
 from utils import verifyEpisodeFormat, verifyDateFormat
 from dbConnector import createTable, addTVShows, createTableForSnoozedTVShows
 
 
 if __name__ == "__main__":
-    #createTable()
+    createTable()
     createTableForSnoozedTVShows()
-    #addTVShows()
-    showNewTVShows()
+    addTVShows()
+    listUnwatchedEpisodes()
+    #showNewTVShows()
     while True:
         cmd = input("-> ").strip()
         if cmd.lower() == "exit":
@@ -46,7 +47,12 @@ if __name__ == "__main__":
                     print("Error: invalid date format. Usage: year-month-day (dd-mm-yyyy)!")
                     continue
                 setDate(date, tv_show_name)
-
+            elif args[0]=="snooze" and len(args)>=2:
+                tv_show_name=" ".join(args[1:])
+                snoozeATVShow(tv_show_name)
+            elif args[0] == "unsnooze" and len(args) >= 2:
+                tv_show_name = " ".join(args[1:])
+                unsnoozeATVShow(tv_show_name)
             else:
                 print("Invalid command")
         except Exception as e:

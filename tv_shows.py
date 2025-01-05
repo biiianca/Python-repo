@@ -2,7 +2,7 @@ from dbConnector import myCursor, myDB
 import mysql.connector
 import requests
 from datetime import datetime
-from imdb import fetchNewShowsFromIMDB
+from imdb import fetchNewShowsFromIMDB, getNextEpisode
 from config import API_KEY
 
 def addTVshow(name, imdb_link, score):
@@ -73,15 +73,6 @@ def deleteTVShow(tv_show_name):
         print(f"Tv show '{tv_show_name}' deleted")
     except mysql.connector.Error as error:
         print(f"Error at deleting the tv show: {error}")
-
-def getWatchedTVShows():
-    try:
-        myCursor.execute("SELECT name, link, last_watched_episode FROM tv_shows WHERE score>=7")
-        return myCursor.fetchall()
-    except mysql.connector.Error as error:
-        print(f"Error fetching unwatched TV shows: {error}")
-        return []
-
 
 def getNewestTVShowDate():
     try:
@@ -156,11 +147,13 @@ def snoozeATVShow(tv_show_name):
         if tv_show_id:
             tv_show_id = tv_show_id[0]
 
-            secondQuery = "INSERT INTO snoozed_tv_shows (tv_show_id) VALUES (%s)"
-            myCursor.execute(secondQuery, (tv_show_id,))
-            myDB.commit()
-
-            print(f"TV Show '{tv_show_name}' has been snoozed")
+            try:
+                secondQuery = "INSERT INTO snoozed_tv_shows (tv_show_id) VALUES (%s)"
+                myCursor.execute(secondQuery, (tv_show_id,))
+                myDB.commit()
+                print(f"TV Show '{tv_show_name}' has been snoozed")
+            except mysql.connector.IntegrityError:
+                print(f"TV Show '{tv_show_name}' is already snoozed")
         else:
             print(f"No TV Show found with the name '{tv_show_name}' in the database")
 
@@ -177,14 +170,63 @@ def unsnoozeATVShow(tv_show_name):
         if tv_show_id:
             tv_show_id = tv_show_id[0]
 
-            secondQuery = "DELETE FROM snoozed_tv_shows WHERE tv_show_id = %s"
-            myCursor.execute(secondQuery, (tv_show_id,))
-            myDB.commit()
+            test_query = "SELECT 'test' FROM snoozed_tv_shows WHERE tv_show_id = %s"
+            myCursor.execute(test_query, (tv_show_id,))
+            is_snoozed = myCursor.fetchone()
 
-            print(f"TV Show '{tv_show_name}' has been unsnoozed")
+            if is_snoozed:
+                secondQuery = "DELETE FROM snoozed_tv_shows WHERE tv_show_id = %s"
+                myCursor.execute(secondQuery, (tv_show_id,))
+                myDB.commit()
+                print(f"TV Show '{tv_show_name}' has been unsnoozed")
+            else:
+                print(f"TV Show '{tv_show_name}' isn't snoozed")
         else:
             print(f"No TV Show found with the name '{tv_show_name}'")
 
     except mysql.connector.Error as error:
         print(f"Error at unsnoozing the TV Show: {error}")
 
+
+def listUnwatchedEpisodes():
+    try:
+        query =  """
+                SELECT tv_shows.id, tv_shows.name, tv_shows.last_watched_episode, tv_shows.date, tv_shows.link, tv_shows.score
+                FROM tv_shows
+                WHERE tv_shows.id NOT IN (SELECT tv_show_id FROM snoozed_tv_shows)
+                ORDER BY tv_shows.score DESC;
+                """
+        myCursor.execute(query)
+        results = myCursor.fetchall()
+
+        if results:
+            print("New episodes for TV shows:\n")
+            for row in results:
+                tv_show_id, name, last_episode, date, link, score = row
+
+                next_episode = getNextEpisode(link, last_episode)
+
+                if next_episode:
+                    next_episode_title = next_episode['title']
+                    next_episode_season = next_episode['season']
+                    next_episode_episode_number = next_episode['episode']
+                else:
+                    next_episode_title = " There are no more episodes for this TV Show! "
+                    next_episode_season = next_episode_episode_number = None
+
+
+                print(f"Name: {name}")
+                print(f"Last Episode Watched: {last_episode}")
+                print(f"Last Watched Date: {date}")
+                if next_episode_season is not None and next_episode_episode_number is not None:
+                    print(f"Next Episode: {next_episode_title} (S{next_episode_season}E{next_episode_episode_number})")
+                else:
+                    print("-----", next_episode_title, "------")
+                print(f"IMDB Link: {link}")
+                print(f"Score: {score}")
+                print("-." * 30)
+        else:
+            print("No new episodes available")
+
+    except mysql.connector.Error as error:
+        print(f"Error at listing new episodes: {error}")
