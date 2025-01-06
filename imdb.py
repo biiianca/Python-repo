@@ -119,5 +119,3 @@ def fetchNewShowsFromIMDB(min_date, min_score):
     new_shows.sort(key=lambda x: x["release_date"], reverse=True)
     return new_shows[:15]
 
-
-

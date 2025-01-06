@@ -4,6 +4,7 @@ import requests
 from datetime import datetime
 from imdb import fetchNewShowsFromIMDB, getNextEpisode
 from config import API_KEY
+from videos import searchTrailers
 
 def addTVshow(name, imdb_link, score):
     try:
@@ -74,6 +75,99 @@ def deleteTVShow(tv_show_name):
     except mysql.connector.Error as error:
         print(f"Error at deleting the tv show: {error}")
 
+def snoozeATVShow(tv_show_name):
+    try:
+        query="SELECT id FROM tv_shows WHERE name = %s"
+        myCursor.execute(query, (tv_show_name,))
+        tv_show_id = myCursor.fetchone()
+
+        if tv_show_id:
+            tv_show_id = tv_show_id[0]
+
+            try:
+                secondQuery = "INSERT INTO snoozed_tv_shows (tv_show_id) VALUES (%s)"
+                myCursor.execute(secondQuery, (tv_show_id,))
+                myDB.commit()
+                print(f"TV Show '{tv_show_name}' has been snoozed")
+            except mysql.connector.IntegrityError:
+                print(f"TV Show '{tv_show_name}' is already snoozed")
+        else:
+            print(f"No TV Show found with the name '{tv_show_name}' in the database")
+
+    except mysql.connector.Error as error:
+        print(f"Error at snoozing the TV Show: {error}")
+
+
+def unsnoozeATVShow(tv_show_name):
+    try:
+        query = "SELECT id FROM tv_shows WHERE name = %s"
+        myCursor.execute(query, (tv_show_name,))
+        tv_show_id = myCursor.fetchone()
+
+        if tv_show_id:
+            tv_show_id = tv_show_id[0]
+
+            test_query = "SELECT 'test' FROM snoozed_tv_shows WHERE tv_show_id = %s"
+            myCursor.execute(test_query, (tv_show_id,))
+            is_snoozed = myCursor.fetchone()
+
+            if is_snoozed:
+                secondQuery = "DELETE FROM snoozed_tv_shows WHERE tv_show_id = %s"
+                myCursor.execute(secondQuery, (tv_show_id,))
+                myDB.commit()
+                print(f"TV Show '{tv_show_name}' has been unsnoozed")
+            else:
+                print(f"TV Show '{tv_show_name}' isn't snoozed")
+        else:
+            print(f"No TV Show found with the name '{tv_show_name}'")
+
+    except mysql.connector.Error as error:
+        print(f"Error at unsnoozing the TV Show: {error}")
+
+def listUnwatchedEpisodes():
+    try:
+        query =  """
+                SELECT tv_shows.id, tv_shows.name, tv_shows.last_watched_episode, tv_shows.date, tv_shows.link, tv_shows.score
+                FROM tv_shows
+                WHERE tv_shows.id NOT IN (SELECT tv_show_id FROM snoozed_tv_shows)
+                ORDER BY tv_shows.score DESC;
+                """
+        myCursor.execute(query)
+        results = myCursor.fetchall()
+
+        if results:
+            print("New episodes for TV shows:\n")
+            for row in results:
+                tv_show_id, name, last_episode, date, link, score = row
+
+                next_episode = getNextEpisode(link, last_episode)
+
+                if next_episode:
+                    next_episode_title = next_episode['title']
+                    next_episode_season = next_episode['season']
+                    next_episode_episode_number = next_episode['episode']
+                else:
+                    next_episode_title = " There are no more episodes for this TV Show! "
+                    next_episode_season = next_episode_episode_number = None
+
+
+                print(f"Name: {name}")
+                print(f"Last Episode Watched: {last_episode}")
+                print(f"Last Watched Date: {date}")
+                if next_episode_season is not None and next_episode_episode_number is not None:
+                    print(f"Next Episode: {next_episode_title} (S{next_episode_season}E{next_episode_episode_number})")
+                else:
+                    print("-----", next_episode_title, "------")
+                print(f"IMDB Link: {link}")
+                print(f"Score: {score}")
+                print("-." * 30)
+        else:
+            print("No new episodes available")
+
+    except mysql.connector.Error as error:
+        print(f"Error at listing new episodes: {error}")
+
+
 def getNewestTVShowDate():
     try:
         myCursor.execute("SELECT link FROM tv_shows")
@@ -138,95 +232,66 @@ def showNewTVShows():
     else:
         print("Couldn't find TV Shows.")
 
-def snoozeATVShow(tv_show_name):
+
+def addVideos(tv_show_id, season, episode, videos, tv_show_name):
     try:
-        query="SELECT id FROM tv_shows WHERE name = %s"
-        myCursor.execute(query, (tv_show_name,))
-        tv_show_id = myCursor.fetchone()
+        query = """
+                INSERT INTO youtube_videos (tv_show_id, season, episode, url)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE url = VALUES(url);
+            """
+        myCursor.executemany(query, [
+            (tv_show_id, season, episode, video["url"]) for video in videos
+        ])
+        myDB.commit()
+        print(f"Saved videos for TV Show '{tv_show_name}', Season {season}, Episode {episode}")
+    except mysql.connector.Error as error:
+        print(f"Error saving videos to database: {error}")
 
-        if tv_show_id:
-            tv_show_id = tv_show_id[0]
 
-            try:
-                secondQuery = "INSERT INTO snoozed_tv_shows (tv_show_id) VALUES (%s)"
-                myCursor.execute(secondQuery, (tv_show_id,))
-                myDB.commit()
-                print(f"TV Show '{tv_show_name}' has been snoozed")
-            except mysql.connector.IntegrityError:
-                print(f"TV Show '{tv_show_name}' is already snoozed")
-        else:
-            print(f"No TV Show found with the name '{tv_show_name}' in the database")
+def getNewVideos(tv_show_id, season, episode, videos):
+    new_videos = []
+    try:
+        query = """
+                SELECT url FROM youtube_videos WHERE tv_show_id = %s AND season = %s AND episode = %s
+            """
+        myCursor.execute(query, (tv_show_id, season, episode))
+        existing_urls = {row[0] for row in myCursor.fetchall()}
+
+        for video in videos:
+            if video["url"] not in existing_urls:
+                new_videos.append(video)
 
     except mysql.connector.Error as error:
-        print(f"Error at snoozing the TV Show: {error}")
+        print(f"Error checking for new videos: {error}")
+    return new_videos
 
-
-def unsnoozeATVShow(tv_show_name):
+def listNewVideos(tv_show_name, season, episode):
     try:
         query = "SELECT id FROM tv_shows WHERE name = %s"
         myCursor.execute(query, (tv_show_name,))
         tv_show_id = myCursor.fetchone()
 
-        if tv_show_id:
-            tv_show_id = tv_show_id[0]
+        if not tv_show_id:
+            print(f"TV Show '{tv_show_name}' not found")
+            return
 
-            test_query = "SELECT 'test' FROM snoozed_tv_shows WHERE tv_show_id = %s"
-            myCursor.execute(test_query, (tv_show_id,))
-            is_snoozed = myCursor.fetchone()
+        tv_show_id = tv_show_id[0]
 
-            if is_snoozed:
-                secondQuery = "DELETE FROM snoozed_tv_shows WHERE tv_show_id = %s"
-                myCursor.execute(secondQuery, (tv_show_id,))
-                myDB.commit()
-                print(f"TV Show '{tv_show_name}' has been unsnoozed")
+        videos = searchTrailers(tv_show_name, season, episode)
+
+        if videos:
+            new_videos = getNewVideos(tv_show_id, season, episode, videos)
+
+            if new_videos:
+                print("New videos found:")
+                for video in new_videos:
+                    print(f"- {video['title']} ({video['publishedAt']})\n  {video['url']}")
+
+                addVideos(tv_show_id, season, episode, new_videos, tv_show_name)
             else:
-                print(f"TV Show '{tv_show_name}' isn't snoozed")
+                print("No more new uploads found")
         else:
-            print(f"No TV Show found with the name '{tv_show_name}'")
-
-    except mysql.connector.Error as error:
-        print(f"Error at unsnoozing the TV Show: {error}")
-
-
-def listUnwatchedEpisodes():
-    try:
-        query =  """
-                SELECT tv_shows.id, tv_shows.name, tv_shows.last_watched_episode, tv_shows.date, tv_shows.link, tv_shows.score
-                FROM tv_shows
-                WHERE tv_shows.id NOT IN (SELECT tv_show_id FROM snoozed_tv_shows)
-                ORDER BY tv_shows.score DESC;
-                """
-        myCursor.execute(query)
-        results = myCursor.fetchall()
-
-        if results:
-            print("New episodes for TV shows:\n")
-            for row in results:
-                tv_show_id, name, last_episode, date, link, score = row
-
-                next_episode = getNextEpisode(link, last_episode)
-
-                if next_episode:
-                    next_episode_title = next_episode['title']
-                    next_episode_season = next_episode['season']
-                    next_episode_episode_number = next_episode['episode']
-                else:
-                    next_episode_title = " There are no more episodes for this TV Show! "
-                    next_episode_season = next_episode_episode_number = None
-
-
-                print(f"Name: {name}")
-                print(f"Last Episode Watched: {last_episode}")
-                print(f"Last Watched Date: {date}")
-                if next_episode_season is not None and next_episode_episode_number is not None:
-                    print(f"Next Episode: {next_episode_title} (S{next_episode_season}E{next_episode_episode_number})")
-                else:
-                    print("-----", next_episode_title, "------")
-                print(f"IMDB Link: {link}")
-                print(f"Score: {score}")
-                print("-." * 30)
-        else:
-            print("No new episodes available")
-
-    except mysql.connector.Error as error:
-        print(f"Error at listing new episodes: {error}")
+            print("No videos found for this episode")
+    except Exception as error:
+        print(f"Error in listNewVideos: {str(error)}")

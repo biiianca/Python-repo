@@ -54,3 +54,39 @@ def createTableForSnoozedTVShows():
         print("snoozed_tv_shows table created")
     except mysql.connector.Error as error:
         print(f"Error at creating the table <snoozed_tv_shows>: {error}")
+
+def createTableForVideos():
+    try:
+        myCursor.execute("""
+            CREATE TABLE youtube_videos (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                tv_show_id INT NOT NULL,
+                season INT,
+                episode INT,
+                url VARCHAR(255) UNIQUE,
+                FOREIGN KEY (tv_show_id) REFERENCES tv_shows(id) ON DELETE CASCADE
+            )
+        """)
+        print("youtube_videos table created")
+    except mysql.connector.Error as error:
+        print(f"Error at creating the table <youtube_videos>: {error}")
+
+def getAllTVShowsInTheDB():
+    try:
+        query = "SELECT name FROM tv_shows"
+        myCursor.execute(query)
+
+        result = myCursor.fetchall()
+
+        tv_show_names = [row[0] for row in result]
+        return tv_show_names
+
+    except mysql.connector.Error as error:
+        print(f"Error fetching TV show names: {error}")
+        return []
+
+def checkIfTableExists(table_name):
+    query = f"SHOW TABLES LIKE '{table_name}'"
+    myCursor.execute(query)
+    result = myCursor.fetchone()
+    return result is not None
