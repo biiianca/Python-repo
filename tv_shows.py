@@ -1,3 +1,5 @@
+import logging
+logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 from dbConnector import myCursor, myDB
 import mysql.connector
 import requests
@@ -233,40 +235,46 @@ def showNewTVShows():
         print("Couldn't find TV Shows.")
 
 
-def addVideos(tv_show_id, season, episode, videos, tv_show_name):
+logging.basicConfig(filename='notifications.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+def addVideos(tv_show_id, season, episode, videos, tv_show_name, type_of_search):
     try:
         query = """
-                INSERT INTO youtube_videos (tv_show_id, season, episode, url)
-                VALUES (%s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE url = VALUES(url);
+                INSERT INTO youtube_videos (tv_show_id, season, episode, url, type)
+                VALUES (%s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE url = VALUES(url), type = VALUES(type);
             """
         myCursor.executemany(query, [
-            (tv_show_id, season, episode, video["url"]) for video in videos
+            (tv_show_id, season, episode, video["url"], type_of_search) for video in videos
         ])
         myDB.commit()
-        print(f"Saved videos for TV Show '{tv_show_name}', Season {season}, Episode {episode}")
-    except mysql.connector.Error as error:
-        print(f"Error saving videos to database: {error}")
 
-
-def getNewVideos(tv_show_id, season, episode, videos):
-    new_videos = []
-    try:
-        query = """
-                SELECT url FROM youtube_videos WHERE tv_show_id = %s AND season = %s AND episode = %s
-            """
-        myCursor.execute(query, (tv_show_id, season, episode))
-        existing_urls = {row[0] for row in myCursor.fetchall()}
-
-        for video in videos:
-            if video["url"] not in existing_urls:
-                new_videos.append(video)
+        if type_of_search == 'notification':
+            logging.info(f"Saved new videos for '{tv_show_name}', Season {season}, Episode {episode}")
+        else:
+            print(f"Saved new videos for '{tv_show_name}', Season {season}, Episode {episode}")
 
     except mysql.connector.Error as error:
-        print(f"Error checking for new videos: {error}")
-    return new_videos
+        logging.error(f"Error saving videos to database: {error}")
 
-def listNewVideos(tv_show_name, season, episode):
+
+# def getNewVideos(tv_show_id, season, episode, videos):
+#     new_videos = []
+#     try:
+#         query = """
+#                 SELECT url FROM youtube_videos WHERE tv_show_id = %s AND season = %s AND episode = %s
+#             """
+#         myCursor.execute(query, (tv_show_id, season, episode))
+#         existing_urls = {row[0] for row in myCursor.fetchall()}
+#
+#         for video in videos:
+#             if video["url"] not in existing_urls:
+#                 new_videos.append(video)
+#
+#     except mysql.connector.Error as error:
+#         print(f"Error checking for new videos: {error}")
+#     return new_videos
+
+def listNewVideos(tv_show_name, season, episode, type_of_search):
     try:
         query = "SELECT id FROM tv_shows WHERE name = %s"
         myCursor.execute(query, (tv_show_name,))
@@ -278,20 +286,86 @@ def listNewVideos(tv_show_name, season, episode):
 
         tv_show_id = tv_show_id[0]
 
-        videos = searchTrailers(tv_show_name, season, episode)
+        videos = searchTrailers(tv_show_name, season, episode, 'trailer')
 
         if videos:
-            new_videos = getNewVideos(tv_show_id, season, episode, videos)
+            print("New videos found:")
+            for video in videos:
+                print(f"- {video['title']} ({video['publishedAt']})\n  {video['url']}")
 
-            if new_videos:
-                print("New videos found:")
-                for video in new_videos:
-                    print(f"- {video['title']} ({video['publishedAt']})\n  {video['url']}")
-
-                addVideos(tv_show_id, season, episode, new_videos, tv_show_name)
-            else:
-                print("No more new uploads found")
+            addVideos(tv_show_id, season, episode, videos, tv_show_name, type_of_search)
         else:
             print("No videos found for this episode")
     except Exception as error:
         print(f"Error in listNewVideos: {str(error)}")
+
+
+
+def notifyForNewVideos(type_of_search):
+    try:
+        query = """
+            SELECT DISTINCT tv_shows.id, tv_shows.name, youtube_videos.season, youtube_videos.episode
+            FROM tv_shows
+            JOIN youtube_videos ON tv_shows.id = youtube_videos.tv_show_id
+        """
+        myCursor.execute(query)
+        tv_shows = myCursor.fetchall()
+
+        if not tv_shows:
+            logging.info("No TV shows found with existing videos in youtube_videos.")
+            return
+
+        for tv_show in tv_shows:
+            tv_show_id, tv_show_name, season, episode = tv_show
+
+            videos = searchTrailers(tv_show_name, season, episode)
+
+            if videos:
+                logging.info(f"New videos found for {tv_show_name} (S{season}E{episode})!")
+                addVideos(tv_show_id, season, episode, videos, tv_show_name, type_of_search)
+            else:
+                logging.info(f"No videos found for {tv_show_name}")
+    except Exception as error:
+        logging.error(f"Error in notifyForNewVideos (search for existing TV shows in youtube_videos): {str(error)}")
+
+
+def markVideosAsSeen():
+    try:
+        query = """
+            UPDATE youtube_videos
+            SET type = 'seen'
+            WHERE type = 'notification'
+        """
+        myCursor.execute(query, )
+        myDB.commit()
+        print(f"You're up to date with the videos!")
+    except mysql.connector.Error as error:
+        print(f"Error marking videos as seen: {error}")
+
+
+def see_notifications():
+    try:
+        query = """
+            SELECT tv_shows.name, youtube_videos.season, youtube_videos.episode, youtube_videos.url
+            FROM youtube_videos
+            JOIN tv_shows ON youtube_videos.tv_show_id = tv_shows.id
+            WHERE youtube_videos.type = 'notification'
+            AND tv_shows.id NOT IN (SELECT tv_show_id FROM snoozed_tv_shows)
+        """
+        myCursor.execute(query)
+        results = myCursor.fetchall()
+
+        if results:
+            message = "New videos to watch:"
+            for row in results:
+                show_name, season, episode, url = row
+                message += f"\nTV Show: {show_name} - S{season}E{episode} - {url}"
+            return message
+        else:
+            return "No new videos available!"
+    except mysql.connector.Error as error:
+        return f"Error retrieving notifications: {error}"
+
+
+
+

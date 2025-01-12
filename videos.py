@@ -1,29 +1,37 @@
 from googleapiclient.discovery import build
 import re
 from config import YOUTUBE_API_KEY
+from dbConnector import myCursor, myDB
+import mysql.connector
+import random
 
-def searchTrailers(tvShowName, season, episode):
+
+def searchTrailers(tvShowName, season, episode, typeOfSearch='notification'):
 
     youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
 
     queryStrings = [f'"{tvShowName}" "s{season:02d}e{episode:02d}"',
                     f'"{tvShowName}" "season {season}" "episode {episode}"',
-                    f'"{tvShowName}" "{season}x{episode:02d}"'
-                    ]
+                    f'"{tvShowName}" "{season}x{episode:02d}"']
 
-    allVideos = []
     seenVideoIds = set()
+    random.shuffle(queryStrings)
+
+    order_by = "viewCount" if typeOfSearch == 'trailer' else "relevance"
+
+    results=[]
 
     try:
         for queryString in queryStrings:
-            request = youtube.search().list(q=queryString,
-                                            part="snippet,id",
-                                            type="video",
-                                            videoDuration="short",
-                                            maxResults=20,
-                                            relevanceLanguage="en",
-                                            order="relevance"
-                                            )
+            request = youtube.search().list(
+                q=queryString,
+                part="snippet,id",
+                type="video",
+                videoDuration="short",
+                maxResults=10,
+                relevanceLanguage="en",
+                order=order_by
+            )
             response = request.execute()
 
             for videoItem in response.get('items', []):
@@ -38,16 +46,25 @@ def searchTrailers(tvShowName, season, episode):
                 if checkWrongShowOrSeason(videoTitle, videoDescription, tvShowName, season, episode):
                     continue
 
-                videoData = {"title": videoTitle,
-                            "url": f"https://www.youtube.com/watch?v={videoId}",
-                            "channel": videoItem['snippet']['channelTitle'],
-                            "publishedAt": videoItem['snippet']['publishedAt'],
-                            "description": videoDescription[:200] + "..." if len(videoDescription) > 200 else videoDescription
-                            }
-                allVideos.append(videoData)
-                seenVideoIds.add(videoId)
+                videoData = {
+                    "title": videoTitle,
+                    "url": f"https://www.youtube.com/watch?v={videoId}",
+                    "channel": videoItem['snippet']['channelTitle'],
+                    "publishedAt": videoItem['snippet']['publishedAt'],
+                    "description": videoDescription[:200] + "..." if len(videoDescription) > 200 else videoDescription
+                }
 
-        return allVideos[:10]
+                if not isVideoInDatabase(tvShowName, season, episode, videoData["url"]):
+                    results.append(videoData)
+                    seenVideoIds.add(videoId)
+
+                if len(results) >= 2:
+                    break
+
+            if len(results) >= 2:
+                break
+
+        return results[:2]
 
     except Exception as error:
         print(f"Error searching YouTube: {str(error)}")
@@ -85,3 +102,36 @@ def checkWrongShowOrSeason(videoTitle, videoDescription, showName, targetSeason,
         return True
 
     return False
+
+def isVideoInDatabase(tvShowName, season, episode, videoUrl):
+    try:
+        query = """
+            SELECT tv_shows.id 
+            FROM tv_shows 
+            WHERE tv_shows.name = %s
+        """
+        myCursor.execute(query, (tvShowName,))
+        result = myCursor.fetchone()
+
+        if not result:
+            print(f"Error: Tv show '{tvShowName}' not found in the database")
+            return False
+
+        tv_show_id = result[0]
+
+        query = """
+            SELECT 1 
+            FROM youtube_videos AS yv
+            INNER JOIN tv_shows AS ts ON ts.id = yv.tv_show_id
+            WHERE ts.id = %s AND yv.season = %s AND yv.episode = %s AND yv.url = %s
+        """
+        myCursor.execute(query, (tv_show_id, season, episode, videoUrl))
+        result = myCursor.fetchone()
+
+        return result is not None
+
+    except mysql.connector.Error as error:
+        print(f"Error checking video in the database: {str(error)}")
+        return False
+
+

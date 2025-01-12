@@ -64,6 +64,7 @@ def createTableForVideos():
                 season INT,
                 episode INT,
                 url VARCHAR(255) UNIQUE,
+                type VARCHAR(20),
                 FOREIGN KEY (tv_show_id) REFERENCES tv_shows(id) ON DELETE CASCADE
             )
         """)
@@ -74,6 +75,20 @@ def createTableForVideos():
 def getAllTVShowsInTheDB():
     try:
         query = "SELECT name FROM tv_shows"
+        myCursor.execute(query)
+
+        result = myCursor.fetchall()
+
+        tv_show_names = [row[0] for row in result]
+        return tv_show_names
+
+    except mysql.connector.Error as error:
+        print(f"Error fetching TV show names: {error}")
+        return []
+
+def getTVShowsFromYtTable():
+    try:
+        query = "SELECT name FROM youtube_videos"
         myCursor.execute(query)
 
         result = myCursor.fetchall()
