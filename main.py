@@ -1,4 +1,6 @@
 import logging
+
+from bingeWatchProject.tv_shows import deleteTVShow
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 import threading
 from tv_shows import showNewTVShows, addTVshow, addLastWatchedEpisode, updateScore, setDate, listUnwatchedEpisodes, \
@@ -8,25 +10,34 @@ from imdb import getNameFromLink
 from utils import verifyEpisodeFormat, verifyDateFormat
 from dbConnector import createTable, addTVShows, createTableForSnoozedTVShows, createTableForVideos, checkIfTableExists, getAllTVShowsInTheDB
 
-logging.basicConfig(filename='notifications.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+logging.basicConfig(filename='info.log', level=logging.INFO, format='%(asctime)s - %(message)s', force=True)
 
 
 def notify_for_new_videos():
+    """
+    The function sends a notification when new videos are found using the notifyForNewVideos() function and runs every 2 minutes.
+    """
     try:
         notifyForNewVideos("notification")
         logging.info("Notification check completed.")
     except Exception as e:
         logging.error(f"Error in notifyForNewVideos: {e}")
 
-    threading.Timer(60, notify_for_new_videos).start()
-
+    threading.Timer(120, notify_for_new_videos).start()
 
 def start_notification_thread():
+    """
+    This starts a background thread that runs the 'notify_for_new_videos' function periodically.
+    """
     notification_thread = threading.Thread(target=notify_for_new_videos, daemon=True)
     notification_thread.start()
 
 
 def main():
+    """
+    Initiates the program, checks if any database tables are necessary, and processes user input commands for managing TV shows and videos.
+    """
+    logging.info("Start")
     try:
         if not checkIfTableExists('tv_shows'):
             createTable()
@@ -35,32 +46,41 @@ def main():
         if not checkIfTableExists('youtube_videos'):
             createTableForVideos()
     except Exception as e:
-        print(f"Error creating tables: {e}")
+        logging.error(f"Error creating tables: {e}")
 
+    addTVShows()
+    listUnwatchedEpisodes()
+    showNewTVShows()
     start_notification_thread()
 
     while True:
         try:
             cmd = input("-> ").strip()
             if cmd.lower() == "exit":
+                logging.info("End")
                 break
 
             args = cmd.split()
+            logging.info(f"Entered command: <{cmd}>")
 
             if args[0] == "add" and len(args) == 3:
                 imdb_link = args[1]
                 score = float(args[2])
                 tv_show_name = getNameFromLink(imdb_link)
-                print(tv_show_name)
+                logging.info(f"TV Show Name: {tv_show_name}")
                 addTVshow(tv_show_name, imdb_link, score)
+
+            elif args[0]=="delete" and len(args)>=2:
+                tv_show_name = " ".join(args[1:])
+                deleteTVShow(tv_show_name)
 
             elif " ".join(args[:3]).lower() == "print tv shows":
                 tv_shows = getAllTVShowsInTheDB()
                 for index, tv_show in enumerate(tv_shows, start=1):
-                    print(f"{index}. {tv_show}")
+                    logging.info(f"{index}. {tv_show}")
 
             elif " ".join(args[:2]).lower() == "see notifications":
-                print(see_notifications())
+                logging.info(see_notifications())
                 markVideosAsSeen()
 
             elif args[:2] == ["update", "episode"] and len(args) >= 4:
@@ -69,7 +89,7 @@ def main():
                 if verifyEpisodeFormat(last_watched_episode):
                     addLastWatchedEpisode(last_watched_episode, tv_show_name)
                 else:
-                    print("Error: Invalid episode format! Usage: update episode <TV Show Name> S<season>E<episode>")
+                    logging.error("Error: Invalid episode format! Usage: update episode <TV Show Name> S<season>E<episode>")
 
             elif args[:2] == ["update", "score"] and len(args) >= 4:
                 tv_show_name = " ".join(args[3:])
@@ -80,7 +100,7 @@ def main():
                 tv_show_name = " ".join(args[3:])
                 date = args[2]
                 if not verifyDateFormat(date):
-                    print("Error: invalid date format. Usage: year-month-day (dd-mm-yyyy)!")
+                    logging.error("Error: invalid date format. Usage: year-month-day (yyyy-mm-dd)!")
                     continue
                 setDate(date, tv_show_name)
 
@@ -103,16 +123,16 @@ def main():
                         episode = int(episode_str)
                         listNewVideos(tv_show_name, season, episode, "trailer")
                     else:
-                        print("Error: Invalid command! Usage: list trailers <TV Show Name> Season:<Number> Episode:<Number>")
+                        logging.error("Error: Invalid command! Usage: list trailers <TV Show Name> Season:<Number> Episode:<Number>")
 
                 except (ValueError, IndexError) as e:
-                    print(f"Error: {e}")
+                    logging.error(f"Error: {e}")
 
             else:
-                print("Invalid command")
+                logging.error(f"Invalid command: <{cmd}>")
 
         except Exception as e:
-            print(f"Error: {e}")
+            logging.error(f"Error: {e}")
 
 
 if __name__ == "__main__":
