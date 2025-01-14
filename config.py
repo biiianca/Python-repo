@@ -1,1 +1,2 @@
-
+API_KEY=""
+YOUTUBE_API_KEY=""
