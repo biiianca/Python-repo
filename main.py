@@ -14,9 +14,7 @@ logging.basicConfig(filename='info.log', level=logging.INFO, format='%(asctime)s
 
 
 def notify_for_new_videos():
-    """
-    The function sends a notification when new videos are found using the notifyForNewVideos() function and runs every 2 minutes.
-    """
+    """The function sends a notification when new videos are found using the notifyForNewVideos() function and runs every 2 minutes."""
     try:
         notifyForNewVideos("notification")
         logging.info("Notification check completed.")
@@ -26,17 +24,13 @@ def notify_for_new_videos():
     threading.Timer(120, notify_for_new_videos).start()
 
 def start_notification_thread():
-    """
-    This starts a background thread that runs the 'notify_for_new_videos' function periodically.
-    """
+    """This starts a background thread that runs the 'notify_for_new_videos' function periodically."""
     notification_thread = threading.Thread(target=notify_for_new_videos, daemon=True)
     notification_thread.start()
 
 
 def main():
-    """
-    Initiates the program, checks if any database tables are necessary, and processes user input commands for managing TV shows and videos.
-    """
+    """Initiates the program, checks if any database tables are necessary, and processes user input commands for managing TV shows and videos."""
     logging.info("Start")
     try:
         if not checkIfTableExists('tv_shows'):

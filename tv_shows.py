@@ -31,15 +31,15 @@ def addTVshow(name, imdb_link, score):
 
 def addLastWatchedEpisode(episode, tv_show_name):
     """
-        This function updates or sets the 'last_watched_episode' field for a specified TV show.
+    This function updates or sets the 'last_watched_episode' field for a specified TV show.
 
-        Args:
-            episode (str): The last episode watched, formatted as 'SxxExx'.
-            tv_show_name (str): The name of the TV show.
+    Args:
+        episode (str): The last episode watched, formatted as 'SxxExx'.
+        tv_show_name (str): The name of the TV show.
 
-        Exceptions:
-            mysql.connector.Error: If an error occurs while executing the update query.
-        """
+    Exceptions:
+        mysql.connector.Error: If an error occurs while executing the update query.
+    """
     try:
         myCursor.execute("SELECT * FROM tv_shows WHERE name=%s", (tv_show_name,))
         result=myCursor.fetchone()
@@ -57,15 +57,15 @@ def addLastWatchedEpisode(episode, tv_show_name):
 
 def updateScore(score, tv_show_name):
     """
-       This function modifies the rating score for a specific TV show.
+    This function modifies the rating score for a specific TV show.
 
-       Args:
-           score (float): The new score to be assigned to the TV show.
-           tv_show_name (str): The name of the TV show.
+    Args:
+        score (float): The new score to be assigned to the TV show.
+        tv_show_name (str): The name of the TV show.
 
-       Exceptions:
-           mysql.connector.Error: If an error occurs while executing the update query.
-       """
+    Exceptions:
+        mysql.connector.Error: If an error occurs while executing the update query.
+    """
     try:
         myCursor.execute("SELECT * FROM tv_shows WHERE name=%s", (tv_show_name,))
         result=myCursor.fetchone()
@@ -84,15 +84,15 @@ def updateScore(score, tv_show_name):
 
 def setDate(date, tv_show_name):
     """
-       This function sets the last watched date for a TV show.
+    This function sets the last watched date for a TV show.
 
-       Args:
-           date (str): The date when the show was last watched, in 'YYYY-MM-DD' format.
-           tv_show_name (str): The name of the TV show.
+    Args:
+        date (str): The date when the show was last watched, in 'YYYY-MM-DD' format.
+        tv_show_name (str): The name of the TV show.
 
-       Exceptions:
-           mysql.connector.Error: If an error occurs while executing the update query.
-       """
+    Exceptions:
+        mysql.connector.Error: If an error occurs while executing the update query.
+    """
     try:
         myCursor.execute("SELECT * FROM tv_shows WHERE name=%s", (tv_show_name,))
         result = myCursor.fetchone()
@@ -111,14 +111,14 @@ def setDate(date, tv_show_name):
 
 def deleteTVShow(tv_show_name):
     """
-        This function removes a TV show from the 'tv_shows' table.
+    This function removes a TV show from the 'tv_shows' table.
 
-        Args:
-            tv_show_name (str): The name of the TV show to be removed.
+    Args:
+        tv_show_name (str): The name of the TV show to be removed.
 
-        Exceptions:
-            mysql.connector.Error: If an error occurs while executing the delete query.
-        """
+    Exceptions:
+        mysql.connector.Error: If an error occurs while executing the delete query.
+    """
     try:
         myCursor.execute("SELECT * FROM tv_shows WHERE name = %s", (tv_show_name,))
         result = myCursor.fetchone()
@@ -310,7 +310,6 @@ def getAverageScore():
     This function computes the average score of all TV shows in the database.
 
     If no score is found or there are no TV shows it returns a default score of 5.
-
     In case of an error during the query, it logs the error and returns 0.
 
     Returns:
@@ -333,14 +332,12 @@ def showNewTVShows():
     This function displays new TV shows for the user based on the earliest release date and average score.
 
     Then retrieves new TV shows from IMDB based on those criteria.
-
     The earliest date, average score, and recommended shows are logged and if no shows meet the criteria, it logs that no shows were found.
 
     Logs:
         - Earliest release date from the database.
         - Average score from the database.
         - Recommended TV shows with their title, score, release date, and link.
-
     """
     latest_date = getEarliestTVShowDate()
     average_score = getAverageScore()
@@ -363,7 +360,6 @@ def addVideos(tv_show_id, season, episode, videos, tv_show_name, type_of_search)
     This function inserts video URLs for a specific TV show, season, and episode in the 'youtube_videos' table.
 
     If the search type is 'notification', it logs a notification message about the saved videos.
-
     If a database error occurs, it logs the error.
 
     Args:
@@ -402,7 +398,6 @@ def listNewVideos(tv_show_name, season, episode, type_of_search):
     This function searches for videos (that were not requested before) related to a TV show, season, and episode.
 
     If videos are found, they are logged, and then added to the database.
-
     If no videos are found, it logs that no videos were found.
 
     Args:
@@ -499,9 +494,7 @@ def see_notifications():
     This function retrieves and displays the TV Shows that were found to have new video uploads.
 
     This function queries the database for TV shows with new videos marked as 'notification', excluding shows in the 'snoozed_tv_shows' list.
-
     It returns a message containing the names, seasons, episodes, and URLs of the new videos.
-
     If no new videos are available, a message indicating that is returned.
 
     Returns:

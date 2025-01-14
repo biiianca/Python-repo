@@ -8,14 +8,15 @@ myCursor=myDB.cursor()
 
 def createTable():
     """
-    This function creates the 'tv_shows' table with the following columns:
+    This function creates the 'tv_shows' table
+
+    The 'tv_shows' table contains the following columns:
     - id: An auto-incremented primary key.
     - name: A unique, non-null string representing the TV show's name.
     - link: A unique, non-null string representing the URL of the TV show's IMDb page.
     - score: A float between 1.0 and 10.0 representing the TV show's rating.
     - last_watched_episode: A string representing the last watched episode in the format 'SxxExx'.
     - date: A date field indicating the last time the TV show was watched.
-
     It ensures that:
     - The name and link are unique and not null.
     - The score is between 1.0 and 10.0.
@@ -81,7 +82,6 @@ def createTableForSnoozedTVShows():
     This function creates the 'snoozed_tv_shows' table in the database.
 
     The table contains an auto-incrementing id for each snoozed TV show, along with a foreign key that links to the 'tv_shows' table.
-
     Logs whether the table creation is successful or encounters an error.
 
     Raises:
